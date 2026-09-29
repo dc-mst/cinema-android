@@ -2,8 +2,8 @@
 
 A native Kotlin / Jetpack Compose client for **every city** of the cinema platform
 (Cinema Bologna, Firenze, Milano, Torino — the backend lives in `server3management`).
-The user picks a city (remembered across launches); three tabs then cover what
-the city's website offers to a visitor who is not logged in:
+The user picks a city (remembered across launches); four tabs then cover what
+the city's website offers:
 
 - **Programma** — the day's films, grouped by film with showtimes per cinema;
   event/festival and cinema pills; a filter sheet with *Versione originale*,
@@ -14,10 +14,17 @@ the city's website offers to a visitor who is not logged in:
   and per film its screenings with tickets sold.
 - **Cerca** — films by title (the city's catalogue, then any film on TMDB), and
   genre shortcuts.
+- **Account** — login, registration and forgotten password; then *Voglio
+  vederlo* (with the reminder choice), *Già visti*, notifications from **every**
+  city (a tap opens the film in its city), the Email/Alerts switches of every
+  city (the app is the only place listing them all), language of emails and
+  websites, theme. Film pages get *Voglio vederlo* / *Già visto* toggles; film
+  cards show both marks. One account and one token for every city.
 - **Film, cinema and genre pages** — all upcoming screenings and past runs of a
   film; a cinema's address (opens the map), phone, website and programme.
 
-It is a read-only, anonymous client of the public API each city serves.
+It is a client of the API each city serves: public endpoints for the
+programme, account endpoints once logged in.
 
 ## Where the city list comes from
 
@@ -57,7 +64,27 @@ All under `<city url>/api` — see the API Reference in `services/cinema-platfor
 | `GET /top-movies`, `GET /top-movies/film?key=` | Più visti ranking and per-film detail |
 | `GET /img?u=<poster>&w=` | Posters, resized to WebP by the city's poster proxy |
 
-DTOs in `data/Models.kt` mirror the backend's `to_dict()` shapes; unknown fields
+### Account endpoints
+
+A token from any city is valid in every city (the accounts live in a shared
+database), so account calls go to the **selected** city — except that
+registering through a city makes it the account's origin city (both switches on
+there), and the password-reset link finishes on the website of the city it was
+asked from. The session (token + user) is encrypted with an Android Keystore
+AES-GCM key (`data/SessionStore.kt`, own prefs file excluded from backups). A
+`401` on any authenticated call logs out.
+
+| Call | Used for |
+|------|----------|
+| `POST /auth/register`, `/auth/login`, `/auth/forgot-password`, `GET /auth/me` | Login (rate limits: login 10/min, register 5/hour, forgot 3/hour per IP) |
+| `GET/POST /user/watchlist`, `PUT/DELETE /user/watchlist/<tmdb_id>`, `POST …/mark-seen` | Voglio vederlo. `has_screenings` is the asked city's: reloaded on city change |
+| `GET/PUT /user/seen-movies`, `DELETE /user/seen-movies/<key>` | Già visti. Key = `normaliseTitle(title)`; marking merges into the server's list before the batch PUT |
+| `GET /movies?keys=` | Titles/posters of seen keys in the city (batches of 60) |
+| `GET /user/cities`, `PUT /user/cities/<slug>` | Email / Alerts per city |
+| `GET /user/notifications?all_cities=1`, `POST …/read-all?all_cities=1` | Every city's notifications; opening the list marks them read, as on the website |
+| `GET/PUT /user/preferences` | `language`, `theme` (person-level, shared with the websites; the app follows `theme` when set) |
+
+DTOs in `data/Models.kt` and `data/Account.kt` mirror the backend's `to_dict()` shapes; unknown fields
 are ignored, so adding backend fields never breaks the app. Removing or renaming
 one the app reads would — `LiveApiTest` (below) catches that.
 
@@ -73,6 +100,10 @@ app/src/main/java/com/devcrumbs/cinema/
 ├── data/Slug.kt              ← slugify() — port of the website's slug.ts
 ├── data/Festivals.kt         ← festival premiere badges
 ├── data/CityRepository.kt    ← bundled city list + remembered choice
+├── data/Account.kt           ← account DTOs
+├── data/AccountApi.kt        ← account endpoints (Bearer token)
+├── data/AccountRepository.kt ← login state + lists, optimistic changes, 401 → logout
+├── data/SessionStore.kt      ← Keystore-encrypted session
 └── ui/
     ├── AppNavigation.kt      ← bottom bar + routes (film, cinema, genre, tmdb, top detail)
     ├── ScheduleViewModel.kt  ← city, day, filters, /api/site
@@ -82,6 +113,8 @@ app/src/main/java/com/devcrumbs/cinema/
     ├── DetailScreens.kt      ← film, TMDB film, cinema, genre pages
     ├── Common.kt             ← film card, showtime chips, badges, loading/error
     ├── Location.kt           ← one coarse fix for "Vicino a me" (no Play services)
+    ├── AccountViewModel.kt   ← account actions for every screen, snackbar notices
+    ├── AccountScreens.kt     ← login, profile, watchlist, seen, notifications, city switches, film toggles
     ├── CityPickerScreen.kt
     └── Theme.kt              ← web palette (frontend/tailwind.config.js `cinema.*`)
 ```
@@ -101,11 +134,16 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties   # if ANDROID_HOME is not s
 ./gradlew assembleRelease                              # minified, unsigned
 ```
 
+The account client and repository are tested against a local fake backend
+(`AccountTest`, OkHttp MockWebServer) with the backend's JSON shapes.
+
 Opt-in tests that need the network:
 
 ```bash
-LIVE_API=1    ./gradlew testDebugUnitTest --tests '*LiveApiTest*'    # every endpoint decodes, every city
-SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*ScreenshotTest*' # renders screens with live data (Robolectric)
+LIVE_API=1    ./gradlew testDebugUnitTest --tests '*LiveApiTest*'    # every endpoint decodes, every city;
+                                                                     # account endpoints exist (401 on a bad token — no login)
+SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*ScreenshotTest*' # renders screens with live data (Robolectric);
+                                                                     # account screens use canned account data
                                                                      # → app/build/outputs/roborazzi/
 ```
 
@@ -115,9 +153,6 @@ Status, order and the backend work each step needs are tracked in
 [`services/cinema-platform/docs/android-app-roadmap.md`](https://github.com/dc-mst/server3management/blob/master/services/cinema-platform/docs/android-app-roadmap.md)
 in `dc-mst/server3management` — start there when resuming.
 
-- Login, watchlist, seen movies, per-city email/alert switches, notifications
-  from every city — the backend is ready (one account for every city), the app is
-  anonymous for now.
 - Push notifications to the app (needs Firebase Cloud Messaging + backend work).
 - Google login in the app (needs an Android OAuth client per city project).
 - Release signing / Play Store listing (the release APK is unsigned).

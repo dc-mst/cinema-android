@@ -45,4 +45,37 @@ class LiveApiTest {
             println("  genres ${genres.size}, search ${search.size}, tmdb ${tmdb.size}")
         }
     }
+
+    /**
+     * The account endpoints can't be exercised without logging in (and a test
+     * must not create accounts on the live sites): check each exists and
+     * refuses a bad token with the 401 that logs the app out, and that the
+     * public "seen" lookup decodes.
+     */
+    @Test
+    fun `account endpoints exist in every city`() = runBlocking {
+        assumeTrue(System.getenv("LIVE_API") == "1")
+        val account = AccountApi()
+        for (city in cities()) {
+            val calls: List<Pair<String, suspend () -> Unit>> = listOf(
+                "me" to { account.me(city, "invalid") },
+                "watchlist" to { account.watchlist(city, "invalid") },
+                "seen-movies" to { account.seenMovies(city, "invalid") },
+                "cities" to { account.cities(city, "invalid") },
+                "notifications" to { account.notifications(city, "invalid") },
+                "preferences" to { account.preferences(city, "invalid") },
+            )
+            for ((name, call) in calls) {
+                try {
+                    call()
+                    throw AssertionError("${city.slug} $name: accepted an invalid token")
+                } catch (e: ApiException) {
+                    if (e.code != 401) throw AssertionError("${city.slug} $name: HTTP ${e.code}, expected 401")
+                }
+            }
+            val title = api.screenings(city, ScreeningQuery(LocalDate.now().toString())).firstOrNull()?.movieTitle
+            val keyed = title?.let { account.moviesByKeys(city, listOf(normaliseTitle(it))) }.orEmpty()
+            println("${city.slug}: account endpoints 401 ok, keys lookup ${keyed.size} film(s) for '$title'")
+        }
+    }
 }

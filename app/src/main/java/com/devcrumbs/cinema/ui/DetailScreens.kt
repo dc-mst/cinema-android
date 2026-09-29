@@ -32,6 +32,7 @@ import com.devcrumbs.cinema.data.City
 import com.devcrumbs.cinema.data.FilmInfo
 import com.devcrumbs.cinema.data.FilmPage
 import com.devcrumbs.cinema.data.Screening
+import com.devcrumbs.cinema.data.WatchlistAdd
 import com.devcrumbs.cinema.data.groupByCinema
 import com.devcrumbs.cinema.data.groupByDate
 import com.devcrumbs.cinema.data.groupByMovie
@@ -57,6 +58,7 @@ fun FilmScreen(api: CinemaApi, city: City, slug: String, onBack: () -> Unit, onO
                 val movie = page.movie ?: FilmInfo(title = slug)
                 LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     item { FilmHeader(city, movie) }
+                    item { FilmAccountActions(city, movie.title, watchlistAdd(movie, page.screenings.minOfOrNull { it.date })) }
                     item {
                         val status = when (page.status) {
                             "current" -> null
@@ -96,12 +98,19 @@ fun TmdbFilmScreen(api: CinemaApi, city: City, tmdbId: Int, onBack: () -> Unit) 
             LoadContent(load, retry) { movie ->
                 LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     item { FilmHeader(city, movie) }
+                    item { FilmAccountActions(city, movie.title, watchlistAdd(movie, null)) }
                     item { Badge(stringResource(R.string.not_scheduled_in, city.cityName), MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             }
         }
     }
 }
+
+/** "Voglio vederlo" needs a TMDB id; [firstDate] (earliest screening) is the reminder's date. */
+internal fun watchlistAdd(movie: FilmInfo, firstDate: String?): WatchlistAdd? =
+    movie.tmdbId?.takeIf { it > 0 && movie.title.isNotBlank() }?.let {
+        WatchlistAdd(it, movie.title, movie.originalTitle, movie.posterUrl, movie.year, firstDate)
+    }
 
 @Composable
 private fun FilmHeader(city: City, movie: FilmInfo) {

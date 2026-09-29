@@ -10,8 +10,11 @@ import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** HTTP error with its status, so callers can tell "not found" from "offline". */
-class ApiException(val code: Int, message: String) : IOException(message)
+/**
+ * HTTP error with its status, so callers can tell "not found" from "offline".
+ * [serverMessage] is the body's `error` text when the backend sent one.
+ */
+class ApiException(val code: Int, message: String, val serverMessage: String? = null) : IOException(message)
 
 /** Server-side filters of `GET /api/screenings` (the website sends the same). */
 data class ScreeningQuery(
@@ -89,7 +92,7 @@ class CinemaApi(
     companion object {
         val defaultJson = Json { ignoreUnknownKeys = true; coerceInputValues = true; explicitNulls = false }
 
-        private val defaultClient: OkHttpClient = OkHttpClient.Builder()
+        internal val defaultClient: OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()

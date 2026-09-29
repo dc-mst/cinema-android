@@ -287,6 +287,18 @@ fun MovieCard(
                     if (s.movieIsFirstWeek) Badge(stringResource(R.string.badge_new))
                     if (s.movieLastChanceDate != null) Badge(stringResource(R.string.badge_last_chance), MaterialTheme.colorScheme.error)
                 }
+                val account = LocalAccountState.current
+                if (account.loggedIn) {
+                    val listed = s.movieTmdbId != null && s.movieTmdbId in account.watchlistIds
+                    val seen = account.isSeen(movie.title)
+                    if (listed || seen) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (listed) Badge("♥ " + stringResource(R.string.want_to_see))
+                            if (seen) Badge("✓ " + stringResource(R.string.seen), MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
                 if (!s.movieFestivalPremieres.isNullOrEmpty()) {
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) { FestivalBadges(s.movieFestivalPremieres) }

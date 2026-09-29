@@ -35,10 +35,11 @@ private val DarkColors = darkColorScheme(
     error = Color(0xFFE57368),
 )
 
+/** [dark] = the account's theme preference (shared with the websites); null follows the system. */
 @Composable
-fun CinemaTheme(content: @Composable () -> Unit) {
+fun CinemaTheme(dark: Boolean? = null, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (dark ?: isSystemInDarkTheme()) DarkColors else LightColors,
         content = content,
     )
 }

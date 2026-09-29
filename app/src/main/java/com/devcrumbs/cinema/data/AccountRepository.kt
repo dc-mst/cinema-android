@@ -1,0 +1,229 @@
+package com.devcrumbs.cinema.data
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+/** An account action was asked for while logged out. */
+class NotLoggedInException : IllegalStateException("Not logged in")
+
+/** What the rest of the app needs to know about the person. */
+data class AccountState(
+    val session: Session? = null,
+    /** "Già visti": `normaliseTitle(title)` keys. */
+    val seenKeys: Set<String> = emptySet(),
+    /** "Voglio vederlo", as the selected city reports it (`has_screenings` is that city's). */
+    val watchlist: List<WatchlistItem> = emptyList(),
+    /** Unread notifications from every city. */
+    val unreadCount: Int = 0,
+    /** Person-level theme preference ("light" | "dark"), shared with the websites; null = follow the system. */
+    val theme: String? = null,
+) {
+    val user: AccountUser? get() = session?.user
+    val loggedIn: Boolean get() = session != null
+    val watchlistIds: Set<Int> get() = watchlist.mapTo(HashSet()) { it.tmdbId }
+
+    fun isSeen(title: String): Boolean = normaliseTitle(title) in seenKeys
+}
+
+/**
+ * Login state and the person's lists. Changes are applied to [state] at once
+ * and rolled back if the server refuses them; a `401` on any call means the
+ * token expired (30 days) or the account is gone, and logs out.
+ */
+class AccountRepository(
+    private val api: AccountApi,
+    private val store: SessionStore,
+) {
+    private val _state = MutableStateFlow(AccountState(session = store.load()))
+    val state: StateFlow<AccountState> = _state.asStateFlow()
+
+    // ── Login ──
+
+    /** Registering through [city] makes it the account's origin city. */
+    suspend fun register(city: City, name: String, email: String, password: String) {
+        val response = api.register(city, name.trim(), email.trim(), password)
+        start(city, Session(response.token, response.user))
+    }
+
+    suspend fun login(city: City, email: String, password: String) {
+        val response = api.login(city, email.trim(), password)
+        start(city, Session(response.token, response.user))
+    }
+
+    suspend fun forgotPassword(city: City, email: String): String? = api.forgotPassword(city, email.trim())
+
+    fun logout() {
+        store.save(null)
+        _state.value = AccountState()
+    }
+
+    private suspend fun start(city: City, session: Session) {
+        store.save(session)
+        _state.value = AccountState(session = session)
+        refresh(city)
+    }
+
+    /**
+     * Reloads everything for [city]: user, seen list, watchlist, unread count,
+     * theme. Offline keeps what is known; a 401 logs out.
+     */
+    suspend fun refresh(city: City) {
+        if (!_state.value.loggedIn) return
+        val user = runCatching { authed { api.me(city, it) } }.getOrNull()
+        if (!_state.value.loggedIn) return
+        if (user != null) updateSession { it.copy(user = user) }
+        runCatching { authed { api.seenMovies(city, it) } }.onSuccess { keys -> _state.update { it.copy(seenKeys = keys.toSet()) } }
+        refreshWatchlist(city)
+        runCatching { authed { api.notifications(city, it) } }.onSuccess { r -> _state.update { it.copy(unreadCount = r.unreadCount) } }
+        runCatching { authed { api.preferences(city, it) } }.onSuccess { prefs ->
+            val theme = prefs["theme"]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
+            _state.update { it.copy(theme = theme?.takeIf { t -> t == "light" || t == "dark" }) }
+        }
+    }
+
+    /** `has_screenings` depends on the city asked: call again after a city change. */
+    suspend fun refreshWatchlist(city: City) {
+        if (!_state.value.loggedIn) return
+        runCatching { authed { api.watchlist(city, it) } }.onSuccess { list -> _state.update { it.copy(watchlist = list) } }
+    }
+
+    // ── Già visti ──
+
+    /**
+     * Marks [title] seen or not. Marking merges into the server's current list
+     * (the website may have added some since this app last loaded it).
+     */
+    suspend fun setSeen(city: City, title: String, seen: Boolean) {
+        val key = normaliseTitle(title)
+        if (key.isEmpty()) return
+        val before = _state.value.seenKeys
+        _state.update { it.copy(seenKeys = if (seen) it.seenKeys + key else it.seenKeys - key) }
+        try {
+            authed { token ->
+                if (seen) {
+                    val server = api.seenMovies(city, token)
+                    val saved = api.putSeenMovies(city, token, (server + key).distinct())
+                    _state.update { it.copy(seenKeys = saved.toSet()) }
+                } else {
+                    try {
+                        api.deleteSeenMovie(city, token, key)
+                    } catch (e: ApiException) {
+                        if (e.code != 404) throw e // already gone
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            _state.update { it.copy(seenKeys = before) }
+            throw e
+        }
+    }
+
+    suspend fun seenMovies(city: City): List<KeyedMovie> = api.moviesByKeys(city, _state.value.seenKeys)
+
+    // ── Voglio vederlo ──
+
+    suspend fun addToWatchlist(city: City, add: WatchlistAdd) {
+        val item = try {
+            authed { api.addToWatchlist(city, it, add) }
+        } catch (e: ApiException) {
+            if (e.code != 409) throw e
+            null // already on the list (added elsewhere): just reload
+        }
+        if (item != null) _state.update { s -> s.copy(watchlist = listOf(item) + s.watchlist.filter { it.tmdbId != item.tmdbId }) }
+        else refreshWatchlist(city)
+    }
+
+    suspend fun removeFromWatchlist(city: City, tmdbId: Int) {
+        val before = _state.value.watchlist
+        _state.update { s -> s.copy(watchlist = s.watchlist.filter { it.tmdbId != tmdbId }) }
+        try {
+            authed { token ->
+                try {
+                    api.removeFromWatchlist(city, token, tmdbId)
+                } catch (e: ApiException) {
+                    if (e.code != 404) throw e
+                }
+            }
+        } catch (e: Exception) {
+            _state.update { it.copy(watchlist = before) }
+            throw e
+        }
+    }
+
+    suspend fun setNotifyTiming(city: City, tmdbId: Int, timing: String) {
+        val item = authed { api.setNotifyTiming(city, it, tmdbId, timing) }
+        _state.update { s -> s.copy(watchlist = s.watchlist.map { if (it.tmdbId == tmdbId) item else it }) }
+    }
+
+    /** Off the watchlist, onto "Già visti" (one server call does both). */
+    suspend fun markWatchlistSeen(city: City, tmdbId: Int) {
+        val key = authed { api.markWatchlistSeen(city, it, tmdbId) }
+        _state.update { s ->
+            s.copy(
+                watchlist = s.watchlist.filter { it.tmdbId != tmdbId },
+                seenKeys = if (key.isNullOrEmpty()) s.seenKeys else s.seenKeys + key,
+            )
+        }
+    }
+
+    // ── Cities, notifications, preferences ──
+
+    suspend fun cities(city: City): List<AccountCity> = authed { api.cities(city, it) }
+
+    suspend fun setCitySwitches(city: City, slug: String, emailEnabled: Boolean? = null, alertsEnabled: Boolean? = null): AccountCity =
+        authed { api.setCitySwitches(city, it, slug, emailEnabled, alertsEnabled) }
+
+    suspend fun notifications(city: City): NotificationsResponse {
+        val response = authed { api.notifications(city, it) }
+        _state.update { it.copy(unreadCount = response.unreadCount) }
+        return response
+    }
+
+    suspend fun readAllNotifications(city: City) {
+        authed { api.readAllNotifications(city, it) }
+        _state.update { it.copy(unreadCount = 0) }
+    }
+
+    /** Language of the emails and of the websites ("it" | "en"), shared by every city. */
+    suspend fun setLanguage(city: City, language: String) {
+        authed { api.putPreferences(city, it, buildJsonObject { put("language", JsonPrimitive(language)) }) }
+        updateSession { it.copy(user = it.user.copy(language = language)) }
+    }
+
+    suspend fun setTheme(city: City, theme: String) {
+        val before = _state.value.theme
+        _state.update { it.copy(theme = theme) }
+        try {
+            authed { api.putPreferences(city, it, buildJsonObject { put("theme", JsonPrimitive(theme)) }) }
+        } catch (e: Exception) {
+            _state.update { it.copy(theme = before) }
+            throw e
+        }
+    }
+
+    // ── Plumbing ──
+
+    private fun updateSession(change: (Session) -> Session) {
+        val current = _state.value.session ?: return
+        val updated = change(current)
+        store.save(updated)
+        _state.update { it.copy(session = updated) }
+    }
+
+    private suspend fun <T> authed(block: suspend (String) -> T): T {
+        val session = _state.value.session ?: throw NotLoggedInException()
+        try {
+            return block(session.token)
+        } catch (e: ApiException) {
+            // Only the token that failed: a new login in the meantime stays.
+            if (e.code == 401 && _state.value.session?.token == session.token) logout()
+            throw e
+        }
+    }
+}

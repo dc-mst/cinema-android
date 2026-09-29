@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. The login (account.xml) is encrypted with a Keystore
+     key that does not travel with a backup, so a restored copy is useless. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="account.xml" />
+</full-backup-content>
