@@ -10,7 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devcrumbs.cinema.ui.CinemaTheme
 import com.devcrumbs.cinema.ui.CityPickerScreen
-import com.devcrumbs.cinema.ui.ScheduleScreen
+import com.devcrumbs.cinema.ui.AppNavigation
 import com.devcrumbs.cinema.ui.ScheduleViewModel
 
 class MainActivity : ComponentActivity() {
@@ -25,13 +25,7 @@ class MainActivity : ComponentActivity() {
                     BackHandler(enabled = state.city != null) { vm.closeCityPicker() }
                     CityPickerScreen(cities = vm.cities, current = state.city, onSelect = vm::selectCity)
                 } else {
-                    ScheduleScreen(
-                        state = state,
-                        onChangeCity = vm::openCityPicker,
-                        onRefresh = vm::refresh,
-                        onSelectDate = vm::selectDate,
-                        onSelectCinema = vm::selectCinema,
-                    )
+                    AppNavigation(vm, state)
                 }
             }
         }
