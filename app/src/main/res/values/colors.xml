@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same palette as the web frontend (frontend/tailwind.config.js `cinema.*`). -->
+    <color name="cinema_gold">#D4A843</color>
+    <color name="cinema_dark">#1A1A2E</color>
+</resources>

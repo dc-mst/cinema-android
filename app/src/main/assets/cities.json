@@ -1,0 +1,6 @@
+[
+  {"slug": "bologna", "name": "Cinema Bologna", "url": "https://cinemabologna.com", "city_name": "Bologna"},
+  {"slug": "firenze", "name": "Cinema Firenze", "url": "https://cinemafirenze.com", "city_name": "Firenze"},
+  {"slug": "milano", "name": "Cinema Milano", "url": "https://milanocinema.com", "city_name": "Milano"},
+  {"slug": "torino", "name": "Cinema Torino", "url": "https://cinematorino.app", "city_name": "Torino"}
+]

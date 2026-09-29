@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cinema</string>
+    <string name="choose_city">Choose your city</string>
+    <string name="choose_city_hint">Showtimes from every cinema in town, updated several times a day.</string>
+    <string name="change_city">Change city</string>
+    <string name="refresh">Refresh</string>
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="all_cinemas">All cinemas</string>
+    <string name="no_screenings">No screenings for this day.</string>
+    <string name="load_error">Could not load the schedule.</string>
+    <string name="retry">Retry</string>
+    <string name="badge_new">New</string>
+    <string name="badge_last_chance">Last days</string>
+    <string name="sold_out">Sold out</string>
+    <string name="few_left">Few seats left</string>
+    <string name="minutes">%1$d min</string>
+    <string name="films_count">%1$d films · %2$d screenings</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="choose_city">Scegli la tua città</string>
+    <string name="choose_city_hint">Gli orari di tutti i cinema della città, aggiornati più volte al giorno.</string>
+    <string name="change_city">Cambia città</string>
+    <string name="refresh">Aggiorna</string>
+    <string name="today">Oggi</string>
+    <string name="tomorrow">Domani</string>
+    <string name="all_cinemas">Tutti i cinema</string>
+    <string name="no_screenings">Nessuna proiezione in questo giorno.</string>
+    <string name="load_error">Impossibile caricare la programmazione.</string>
+    <string name="retry">Riprova</string>
+    <string name="badge_new">Novità</string>
+    <string name="badge_last_chance">Ultimi giorni</string>
+    <string name="sold_out">Esaurito</string>
+    <string name="few_left">Ultimi posti</string>
+    <string name="minutes">%1$d min</string>
+    <string name="films_count">%1$d film · %2$d proiezioni</string>
+</resources>

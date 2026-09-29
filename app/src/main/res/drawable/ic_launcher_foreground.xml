@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Film-reel glyph on the 108dp adaptive-icon canvas (safe zone 66dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#D4A843"
+        android:pathData="M54,30a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
+    <path
+        android:fillColor="#1A1A2E"
+        android:pathData="M54,36a5,5 0,1 1,0 10a5,5 0,1 1,0 -10zM54,62a5,5 0,1 1,0 10a5,5 0,1 1,0 -10zM41,49a5,5 0,1 1,0 10a5,5 0,1 1,0 -10zM67,49a5,5 0,1 1,0 10a5,5 0,1 1,0 -10zM54,51.5a2.5,2.5 0,1 1,0 5a2.5,2.5 0,1 1,0 -5z" />
+</vector>
