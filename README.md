@@ -111,6 +111,10 @@ SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*ScreenshotTest*' # renders s
 
 ## Not done yet
 
+Status, order and the backend work each step needs are tracked in
+[`services/cinema-platform/docs/android-app-roadmap.md`](https://github.com/dc-mst/server3management/blob/master/services/cinema-platform/docs/android-app-roadmap.md)
+in `dc-mst/server3management` — start there when resuming.
+
 - Login, watchlist, seen movies, per-city email/alert switches, notifications
   from every city — the backend is ready (one account for every city), the app is
   anonymous for now.
