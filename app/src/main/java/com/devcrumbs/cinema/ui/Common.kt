@@ -222,6 +222,13 @@ fun FestivalBadges(premieres: List<FestivalPremiere>?) {
     }
 }
 
+/**
+ * Joins facts with " · ", each in its own bidi isolate (FSI…PDI): a director's
+ * name in a right-to-left script (TMDB returns some in Arabic or Hebrew) would
+ * otherwise reorder the whole line ("80 · 2026 · <name> min").
+ */
+fun factsLine(parts: List<String>): String = parts.joinToString(" · ") { "\u2068$it\u2069" }
+
 fun localizedDescription(it: String?, en: String?): String? {
     val english = Locale.getDefault().language == "en"
     return (if (english) en ?: it else it ?: en)?.takeIf { d -> d.isNotBlank() }
@@ -270,7 +277,7 @@ fun MovieCard(
                     s.movieDirector?.trim()?.takeIf { it.isNotBlank() },
                     s.movieYear?.toString(),
                     s.movieDurationMinutes?.let { stringResource(R.string.minutes, it) },
-                ).joinToString(" · ")
+                ).let(::factsLine)
                 if (meta.isNotEmpty()) {
                     Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

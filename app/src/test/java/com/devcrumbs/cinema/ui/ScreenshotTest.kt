@@ -1,6 +1,13 @@
 package com.devcrumbs.cinema.ui
 
 import android.app.Application
+import android.os.Looper
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.Shadows.shadowOf
 
 /**
  * Renders the real screens on the JVM (Robolectric) with LIVE data, to look at
@@ -34,28 +42,34 @@ class ScreenshotTest {
     @Before
     fun optIn() = assumeTrue(System.getenv("SCREENSHOTS") == "1")
 
-    private fun waitForData() {
-        // Network happens off the main thread; let it land, then settle.
-        compose.waitUntil(20_000) {
-            runCatching { compose.onRoot().fetchSemanticsNode() }.isSuccess &&
-                compose.onAllNodes(androidx.compose.ui.test.hasProgressBarRangeInfo(
-                    androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate)).fetchSemanticsNodes().isEmpty()
+    /** Network runs on IO threads; results land on Robolectric's paused main
+     *  looper, so drive it until [done] (and nothing is loading), then settle. */
+    private fun waitForData(done: () -> Boolean = { true }) {
+        val deadline = System.currentTimeMillis() + 25_000
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(250)
+            shadowOf(Looper.getMainLooper()).idle()
+            compose.waitForIdle()
+            val loading = compose.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+                .fetchSemanticsNodes().isNotEmpty()
+            if (done() && !loading) break
         }
-        Thread.sleep(1500)
+        Thread.sleep(1500) // posters (Coil, own dispatcher)
+        shadowOf(Looper.getMainLooper()).idle()
         compose.waitForIdle()
     }
 
-    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onRoot() =
-        onNode(androidx.compose.ui.test.isRoot())
+    private fun ComposeContentTestRule.onRoot() = onNode(isRoot())
 
     @Test
     fun programme() {
         val vm = ScheduleViewModel(ApplicationProvider.getApplicationContext<Application>())
         vm.selectCity(vm.cities.first { it.slug == city.slug })
-        compose.setContent { CinemaTheme { AppNavigation(vm, vm.state.value.copy()) } }
-        compose.waitUntil(20_000) { vm.state.value.screenings.isNotEmpty() }
-        compose.setContent { CinemaTheme { AppNavigation(vm, vm.state.value) } }
-        waitForData()
+        compose.setContent {
+            val state by vm.state.collectAsState()
+            CinemaTheme { AppNavigation(vm, state) }
+        }
+        waitForData { vm.state.value.screenings.isNotEmpty() }
         compose.onRoot().captureRoboImage("programme.png")
     }
 

@@ -147,3 +147,11 @@ class SlugTest {
         assertEquals("TO", festivalInitial("tiff"))
     }
 }
+
+class FactsLineTest {
+    @Test
+    fun `each fact is direction-isolated`() {
+        assertEquals("⁨يوفال⁩ · ⁨2026⁩", com.devcrumbs.cinema.ui.factsLine(listOf("يوفال", "2026")))
+        assertEquals("", com.devcrumbs.cinema.ui.factsLine(emptyList()))
+    }
+}

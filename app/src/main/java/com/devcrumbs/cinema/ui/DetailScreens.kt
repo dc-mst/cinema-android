@@ -120,7 +120,7 @@ private fun FilmHeader(city: City, movie: FilmInfo) {
                     movie.year?.toString(),
                     movie.durationMinutes?.let { stringResource(R.string.minutes, it) },
                     movie.ageRating?.takeIf { it.isNotBlank() },
-                ).joinToString(" · ")
+                ).let(::factsLine)
                 if (meta.isNotEmpty()) Text(meta, style = MaterialTheme.typography.bodySmall)
                 movie.genre?.takeIf { it.isNotBlank() }?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
