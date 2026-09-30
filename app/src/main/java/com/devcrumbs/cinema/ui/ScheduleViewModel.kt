@@ -112,11 +112,14 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         loadCity(city)
     }
 
-    /** A notification's film: switch to its city (if known) and open the film page there. */
+    /**
+     * A notification: switch to its city (if known) and open the film page
+     * there — or just the city's programme when [filmSlug] is empty (a
+     * new-films digest of several films).
+     */
     fun openFilm(citySlug: String, filmSlug: String) {
-        if (filmSlug.isEmpty()) return
         cities.firstOrNull { it.slug == citySlug }?.let { selectCity(it) }
-        if (_state.value.city == null) return
+        if (_state.value.city == null || filmSlug.isEmpty()) return
         _state.update { it.copy(pendingFilm = filmSlug, pickingCity = false) }
     }
 

@@ -556,8 +556,11 @@ internal fun formatTimestamp(iso: String): String? = runCatching {
 // ── Email / alerts per city ─────────────────────────────────────────────────
 
 @Composable
-fun CitySwitchesScreen(account: AccountViewModel, city: City, onBack: () -> Unit) {
+fun CitySwitchesScreen(account: AccountViewModel, city: City, appCities: List<City>, onBack: () -> Unit) {
     val (load, retry) = rememberLoad(Unit) { account.repo.cities(city) }
+    // Each city's own switch, from each city's API (loaded alongside, never blocking).
+    val newFilms = remember { mutableStateMapOf<String, Boolean>() }
+    LaunchedEffect(Unit) { runCatching { newFilms.putAll(account.repo.newFilmsSwitches(appCities)) } }
     ScreenScaffold(title = { Text(stringResource(R.string.city_switches_title)) }, onBack = onBack) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             LoadContent(load, retry) { cities ->
@@ -582,10 +585,25 @@ fun CitySwitchesScreen(account: AccountViewModel, city: City, onBack: () -> Unit
                                 }
                             }
                         }
+                        val target = appCities.firstOrNull { it.slug == slug }
                         CitySwitchCard(
                             row,
                             onEmail = { change(row.copy(emailEnabled = it), it, null) },
                             onAlerts = { change(row.copy(alertsEnabled = it), null, it) },
+                            newFilms = newFilms[slug],
+                            onNewFilms = { on ->
+                                if (target != null) {
+                                    newFilms[slug] = on
+                                    account.act {
+                                        try {
+                                            account.repo.setNewFilms(target, on)
+                                        } catch (e: Exception) {
+                                            newFilms[slug] = !on
+                                            throw e
+                                        }
+                                    }
+                                }
+                            },
                         )
                     }
                 }
@@ -595,7 +613,13 @@ fun CitySwitchesScreen(account: AccountViewModel, city: City, onBack: () -> Unit
 }
 
 @Composable
-private fun CitySwitchCard(row: AccountCity, onEmail: (Boolean) -> Unit, onAlerts: (Boolean) -> Unit) {
+private fun CitySwitchCard(
+    row: AccountCity,
+    onEmail: (Boolean) -> Unit,
+    onAlerts: (Boolean) -> Unit,
+    newFilms: Boolean?,
+    onNewFilms: (Boolean) -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -604,15 +628,17 @@ private fun CitySwitchCard(row: AccountCity, onEmail: (Boolean) -> Unit, onAlert
             }
             SwitchLine(stringResource(R.string.switch_email), row.emailEnabled, onEmail)
             SwitchLine(stringResource(R.string.switch_alerts), row.alertsEnabled, onAlerts)
+            // null: not loaded yet, or the city could not be reached.
+            SwitchLine(stringResource(R.string.switch_new_films), newFilms ?: false, onNewFilms, enabled = newFilms != null)
         }
     }
 }
 
 @Composable
-private fun SwitchLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun SwitchLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
 

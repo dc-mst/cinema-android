@@ -69,7 +69,7 @@
     <string name="unread_n">%1$d nuove</string>
     <string name="city_switches_title">Email e avvisi</string>
     <string name="city_switches_hint">Quali città possono scriverti</string>
-    <string name="city_switches_explainer">Un solo account per tutte le città. Scegli quali città possono mandarti email e avvisi quando un film della tua lista arriva lì.</string>
+    <string name="city_switches_explainer">Un solo account per tutte le città. Scegli quali città possono mandarti email e avvisi quando un film della tua lista arriva lì, e quali ti avvisano nell’app quando arrivano nuovi film in programmazione.</string>
     <string name="home_city">Città d’origine</string>
     <string name="switch_email">Email</string>
     <string name="switch_alerts">Avvisi</string>
@@ -125,4 +125,5 @@
     <string name="notification_text">%1$s è in programmazione a %2$s</string>
     <string name="channel_watchlist">Film della tua lista</string>
     <string name="channel_watchlist_description">Quando un film che vuoi vedere arriva in programmazione, promemoria e ultimi giorni.</string>
+    <string name="switch_new_films">Nuovi film</string>
 </resources>

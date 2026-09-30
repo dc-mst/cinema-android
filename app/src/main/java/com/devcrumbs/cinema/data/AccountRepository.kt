@@ -4,7 +4,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -220,6 +224,25 @@ class AccountRepository(
     suspend fun setCitySwitches(city: City, slug: String, emailEnabled: Boolean? = null, alertsEnabled: Boolean? = null): AccountCity =
         authed { api.setCitySwitches(city, it, slug, emailEnabled, alertsEnabled) }
 
+    /**
+     * "New films" push per city. Each city keeps this switch in its own
+     * database, so it is read and written through that city's own API (the
+     * token is valid everywhere). A city that cannot be reached is left out.
+     */
+    suspend fun newFilmsSwitches(cities: List<City>): Map<String, Boolean> = coroutineScope {
+        cities.map { c ->
+            async {
+                runCatching { authed { api.preferences(c, it) } }.getOrNull()?.let { prefs ->
+                    c.slug to (prefs[NEW_FILMS_PREF]?.let { runCatching { it.jsonPrimitive.booleanOrNull }.getOrNull() } ?: false)
+                }
+            }
+        }.awaitAll().filterNotNull().toMap()
+    }
+
+    suspend fun setNewFilms(target: City, on: Boolean) {
+        authed { api.putPreferences(target, it, buildJsonObject { put(NEW_FILMS_PREF, JsonPrimitive(on)) }) }
+    }
+
     suspend fun notifications(city: City): NotificationsResponse {
         val response = authed { api.notifications(city, it) }
         _state.update { it.copy(unreadCount = response.unreadCount) }
@@ -249,6 +272,11 @@ class AccountRepository(
     }
 
     // ── Plumbing ──
+
+    companion object {
+        /** City-scoped preference the backend's new-films push reads (`push.APP_NEW_MOVIES_PREF_KEY`). */
+        const val NEW_FILMS_PREF = "app_new_movies"
+    }
 
     private fun updateSession(change: (Session) -> Session) {
         val current = _state.value.session ?: return

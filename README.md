@@ -92,7 +92,9 @@ config (committed — it identifies the app, it is not a secret). Messaging only
 no Analytics. The backend (`app/services/fcm.py` in the platform) sends
 **data-only** messages for the same events as its web push — a film on the list
 starts showing, a reminder, last days — from each city whose *Alerts* switch
-the person turned on. `push/Push.kt` builds the notification ("Films on your
+the person turned on — plus, per city, a "new films" digest where the person
+switched *New films* on (a city-scoped preference `app_new_movies`, read and
+written through each city's own `/user/preferences`). `push/Push.kt` builds the notification ("Films on your
 list" channel); a tap opens the film in the city that sent it. Android 13+ asks
 for the permission once, after login. Logout unregisters the phone and deletes
 the FCM token (also when the session expired, so an old account's alerts stop).

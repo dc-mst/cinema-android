@@ -152,7 +152,7 @@ fun AppNavigation(vm: ScheduleViewModel, state: ScheduleUiState, account: Accoun
                     })
                 }
                 composable(ROUTE_CITIES) {
-                    CitySwitchesScreen(account, city, onBack = { nav.popBackStack() })
+                    CitySwitchesScreen(account, city, vm.cities, onBack = { nav.popBackStack() })
                 }
             }
         }

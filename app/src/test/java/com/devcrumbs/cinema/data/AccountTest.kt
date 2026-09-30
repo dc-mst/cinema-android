@@ -327,6 +327,20 @@ class AccountTest {
     }
 
     @Test
+    fun `new films switch is read and written in each city`() = runBlocking {
+        loggedInBackend()
+        val repo = loggedIn()
+        route("GET /api/user/preferences") { """{"preferences": {"app_new_movies": true, "theme": "dark"}}""" }
+        val unreachable = City("torino", "Cinema Torino", "http://127.0.0.1:1/", "Torino")
+        assertEquals(mapOf("bologna" to true), repo.newFilmsSwitches(listOf(city, unreachable)))
+
+        var sent: String? = null
+        route("PUT /api/user/preferences") { r -> sent = r.body.readUtf8(); """{"preferences": {}}""" }
+        repo.setNewFilms(city, false)
+        assertEquals("""{"preferences":{"app_new_movies":false}}""", sent)
+    }
+
+    @Test
     fun `actions need a login`() = runBlocking {
         val repo = AccountRepository(api, InMemorySessionStore())
         try {

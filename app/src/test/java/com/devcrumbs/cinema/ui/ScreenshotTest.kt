@@ -136,7 +136,7 @@ class ScreenshotTest {
                 {"slug": "firenze", "name": "Cinema Firenze", "email_enabled": false, "alerts_enabled": false},
                 {"slug": "milano", "name": "Cinema Milano", "email_enabled": false, "alerts_enabled": true},
                 {"slug": "torino", "name": "Cinema Torino", "email_enabled": false, "alerts_enabled": false}]}""",
-            "/api/user/preferences" to """{"preferences": {}}""",
+            "/api/user/preferences" to """{"preferences": {"app_new_movies": true}}""",
         )
         val client = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
             val body = canned[chain.request().url.encodedPath] ?: return@Interceptor chain.proceed(chain.request())
@@ -192,7 +192,7 @@ class ScreenshotTest {
     @Test
     fun citySwitches() {
         val account = loggedInAccount()
-        compose.setContent { CinemaTheme { CitySwitchesScreen(account, city, onBack = {}) } }
+        compose.setContent { CinemaTheme { CitySwitchesScreen(account, city, ScheduleViewModel(ApplicationProvider.getApplicationContext<Application>()).cities, onBack = {}) } }
         waitForData()
         compose.onRoot().captureRoboImage("account-cities.png")
     }
