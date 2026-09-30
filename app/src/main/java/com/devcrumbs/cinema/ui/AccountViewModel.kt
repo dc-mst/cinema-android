@@ -26,7 +26,10 @@ import kotlinx.coroutines.launch
 /** Login, "Voglio vederlo", "Già visti", notifications — for every screen. */
 class AccountViewModel @JvmOverloads constructor(
     app: Application,
-    val repo: AccountRepository = AccountRepository(AccountApi(), KeystoreSessionStore(app), FirebasePushDevice),
+    val repo: AccountRepository = AccountRepository(
+        AccountApi(), KeystoreSessionStore(app), FirebasePushDevice,
+        onPushProblem = { android.util.Log.w("CinemaPush", it) },
+    ),
 ) : AndroidViewModel(app) {
     val state: StateFlow<AccountState> = repo.state
 

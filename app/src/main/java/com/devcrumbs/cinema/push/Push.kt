@@ -52,7 +52,10 @@ class CinemaMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         val cities = CityRepository(this)
         val city = cities.selectedCity() ?: cities.cities.firstOrNull() ?: return
-        val repo = AccountRepository(AccountApi(), KeystoreSessionStore(this))
+        val repo = AccountRepository(
+            AccountApi(), KeystoreSessionStore(this),
+            onPushProblem = { android.util.Log.w("CinemaPush", it) },
+        )
         runBlocking { repo.registerDevice(city, token) }
     }
 

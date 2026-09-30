@@ -4,9 +4,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -18,6 +25,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * repository so tests and previews need no Firebase.
  */
 interface PushDevice {
+    /** False when this build has no push at all (tests, previews): nothing to register or retry. */
+    val available: Boolean get() = true
+
     /** The current FCM token, or null when push is unavailable. */
     suspend fun token(): String?
 
@@ -26,6 +36,7 @@ interface PushDevice {
 }
 
 object NoPushDevice : PushDevice {
+    override val available = false
     override suspend fun token(): String? = null
     override fun forget() = Unit
 }
@@ -61,7 +72,13 @@ class AccountRepository(
     private val api: AccountApi,
     private val store: SessionStore,
     private val push: PushDevice = NoPushDevice,
+    /** Waits before each background retry of a failed push registration. */
+    private val pushRetryDelaysMs: List<Long> = listOf(5_000, 30_000, 120_000, 600_000),
+    private val pushScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /** Why a push registration attempt failed (the app logs it; tests collect it). */
+    private val onPushProblem: (String) -> Unit = {},
 ) {
+    private var pushRetry: Job? = null
     private val _state = MutableStateFlow(AccountState(session = store.load()))
     val state: StateFlow<AccountState> = _state.asStateFlow()
 
@@ -86,6 +103,7 @@ class AccountRepository(
      * phone must stop receiving the old account's alerts anyway.
      */
     fun logout() {
+        pushRetry?.cancel()
         store.save(null)
         _state.value = AccountState()
         push.forget()
@@ -100,11 +118,36 @@ class AccountRepository(
         logout()
     }
 
-    /** Registers this install for push (after login, at start, when FCM rotates the token). */
+    /**
+     * Registers this install for push (after login, at start, when FCM rotates
+     * the token). The first attempt runs here; if it fails — no FCM token yet
+     * (first launch, phone locked, offline) or the server call errors — it is
+     * retried in the background with growing waits, so a transient failure no
+     * longer leaves the phone silently without push until the next app start.
+     */
     suspend fun registerDevice(city: City, deviceToken: String? = null) {
-        if (!_state.value.loggedIn) return
-        val token = deviceToken ?: runCatching { push.token() }.getOrNull() ?: return
-        runCatching { authed { api.registerDevice(city, it, token) } }
+        if (!_state.value.loggedIn || !push.available) return
+        if (tryRegisterDevice(city, deviceToken)) return
+        pushRetry?.cancel()
+        pushRetry = pushScope.launch {
+            for (wait in pushRetryDelaysMs) {
+                delay(wait)
+                if (!isActive || !_state.value.loggedIn) return@launch
+                if (tryRegisterDevice(city, deviceToken)) return@launch
+            }
+            onPushProblem("push registration gave up after ${pushRetryDelaysMs.size} retries")
+        }
+    }
+
+    private suspend fun tryRegisterDevice(city: City, deviceToken: String?): Boolean {
+        val token = deviceToken ?: runCatching { push.token() }.getOrNull()
+        if (token == null) {
+            onPushProblem("no FCM token available")
+            return false
+        }
+        return runCatching { authed { api.registerDevice(city, it, token) } }
+            .onFailure { onPushProblem("registering the device failed: ${it.message}") }
+            .isSuccess
     }
 
     private suspend fun start(city: City, session: Session) {

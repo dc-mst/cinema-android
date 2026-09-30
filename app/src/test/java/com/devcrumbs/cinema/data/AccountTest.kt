@@ -1,6 +1,12 @@
 package com.devcrumbs.cinema.data
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -293,6 +299,52 @@ class AccountTest {
         val body = bodyOf(request)
         assertEquals("fcm-1", body["token"]!!.jsonPrimitive.content)
         assertEquals("android", body["platform"]!!.jsonPrimitive.content)
+    }
+
+    /** A push device whose token is missing for the first [missing] calls, as before Firebase is ready. */
+    private class LateToken(private var missing: Int) : PushDevice {
+        override suspend fun token(): String? = if (missing-- > 0) null else "fcm-late"
+        override fun forget() = Unit
+    }
+
+    private fun pushRegistrations() = requests.count { it.requestUrl!!.encodedPath == "/api/push/device" }
+
+    @Test
+    fun `a missing FCM token is retried in the background and then registers`() = runBlocking {
+        loggedInBackend()
+        route("POST /api/push/device") { """{"message": "ok"}""" }
+        val problems = CopyOnWriteArrayList<String>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            AccountRepository(
+                api, InMemorySessionStore(), LateToken(missing = 2),
+                pushRetryDelaysMs = listOf(20, 20, 20), pushScope = scope, onPushProblem = { problems += it },
+            ).login(city, "ada@example.com", "secret")
+            assertEquals(0, pushRegistrations()) // first attempt found no token
+            withTimeout(5_000) { while (pushRegistrations() == 0) delay(10) }
+            assertEquals("fcm-late", bodyOf(requests.last { it.requestUrl!!.encodedPath == "/api/push/device" })["token"]!!.jsonPrimitive.content)
+            assertEquals(listOf("no FCM token available", "no FCM token available"), problems.toList())
+        } finally { scope.cancel() }
+    }
+
+    @Test
+    fun `retries stop at logout and a build without push never retries`() = runBlocking {
+        loggedInBackend()
+        route("POST /api/push/device") { """{"message": "ok"}""" }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val repo = AccountRepository(
+                api, InMemorySessionStore(), LateToken(missing = 99),
+                pushRetryDelaysMs = listOf(150), pushScope = scope,
+            ).also { it.login(city, "ada@example.com", "secret") }
+            repo.logout()
+            delay(400)
+            assertEquals(0, pushRegistrations())
+            val problems = CopyOnWriteArrayList<String>()
+            AccountRepository(api, InMemorySessionStore(), NoPushDevice, pushScope = scope, onPushProblem = { problems += it })
+                .login(city, "ada@example.com", "secret")
+            assertEquals(emptyList<String>(), problems.toList())
+        } finally { scope.cancel() }
     }
 
     @Test
