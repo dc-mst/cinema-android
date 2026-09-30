@@ -276,6 +276,56 @@ class AccountTest {
         assertNull(store.load())
     }
 
+    private class FakePush(val token: String? = "fcm-1") : PushDevice {
+        var forgotten = 0
+        override suspend fun token() = token
+        override fun forget() { forgotten++ }
+    }
+
+    @Test
+    fun `login registers this phone for push`() = runBlocking {
+        loggedInBackend()
+        route("POST /api/push/device") { """{"message": "ok", "push_configured": true}""" }
+        val push = FakePush()
+        AccountRepository(api, InMemorySessionStore(), push).login(city, "ada@example.com", "secret")
+        val request = requests.single { it.requestUrl!!.encodedPath == "/api/push/device" }
+        assertEquals("Bearer tok", request.getHeader("Authorization"))
+        val body = bodyOf(request)
+        assertEquals("fcm-1", body["token"]!!.jsonPrimitive.content)
+        assertEquals("android", body["platform"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `sign out unregisters the phone, then forgets its token`() = runBlocking {
+        loggedInBackend()
+        route("POST /api/push/device") { """{"message": "ok"}""" }
+        route("DELETE /api/push/device") { """{"message": "ok", "removed": 1}""" }
+        val push = FakePush()
+        val repo = AccountRepository(api, InMemorySessionStore(), push).also { it.login(city, "ada@example.com", "secret") }
+        repo.signOut(city)
+        val delete = requests.single { it.method == "DELETE" }
+        assertEquals("fcm-1", bodyOf(delete)["token"]!!.jsonPrimitive.content)
+        assertFalse(repo.state.value.loggedIn)
+        assertEquals(1, push.forgotten)
+    }
+
+    @Test
+    fun `sign out works offline and an expired session still forgets the token`() = runBlocking {
+        loggedInBackend()
+        val push = FakePush()
+        val repo = AccountRepository(api, InMemorySessionStore(), push).also { it.login(city, "ada@example.com", "secret") }
+        route("GET /api/user/cities", code = 401) { """{"error": "Token scaduto."}""" }
+        runCatching { repo.cities(city) }
+        assertFalse(repo.state.value.loggedIn)
+        assertEquals(1, push.forgotten) // the server row dies with the token
+
+        val repo2 = AccountRepository(api, InMemorySessionStore(), push).also { it.login(city, "ada@example.com", "secret") }
+        server.shutdown()
+        repo2.signOut(city)
+        assertFalse(repo2.state.value.loggedIn)
+        assertEquals(2, push.forgotten)
+    }
+
     @Test
     fun `actions need a login`() = runBlocking {
         val repo = AccountRepository(api, InMemorySessionStore())

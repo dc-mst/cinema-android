@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "428847251547",
+    "project_id": "cinema-devcrumbs",
+    "storage_bucket": "cinema-devcrumbs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:428847251547:android:42914a23f2d52bad99ff7e",
+        "android_client_info": {
+          "package_name": "com.devcrumbs.cinema"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBg_gxWCHenkHZzGWh9ySio23RAKM5iFC8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

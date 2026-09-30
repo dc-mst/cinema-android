@@ -123,4 +123,6 @@
     <string name="notifications_title">Notifiche</string>
     <string name="notifications_empty">Nessuna notifica.</string>
     <string name="notification_text">%1$s è in programmazione a %2$s</string>
+    <string name="channel_watchlist">Film della tua lista</string>
+    <string name="channel_watchlist_description">Quando un film che vuoi vedere arriva in programmazione, promemoria e ultimi giorni.</string>
 </resources>

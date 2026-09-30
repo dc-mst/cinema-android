@@ -67,15 +67,16 @@ fun AppNavigation(vm: ScheduleViewModel, state: ScheduleUiState, account: Accoun
     val accountState by account.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    // A notification's film in another city: opened once that city is selected.
-    var pendingFilm by rememberSaveable { mutableStateOf<String?>(null) }
-
     // A different city: every open page belongs to the old one.
     LaunchedEffect(city.slug) {
         nav.popBackStack(Tab.PROGRAMME.route, inclusive = false)
-        pendingFilm?.let { pendingFilm = null; nav.openFilm(it) }
         account.onCity(city)
     }
+    // A notification's film (push or the notifications list), once its city is shown.
+    LaunchedEffect(city.slug, state.pendingFilm) {
+        state.pendingFilm?.let { vm.consumePendingFilm(); nav.openFilm(it) }
+    }
+    AskNotificationPermission(accountState.loggedIn)
     LaunchedEffect(Unit) { account.notices.collect { snackbar.showSnackbar(context.getString(it)) } }
 
     val hooks = remember(account, nav) { AccountHooks(account) { nav.openTab(Tab.ACCOUNT) } }
@@ -147,13 +148,7 @@ fun AppNavigation(vm: ScheduleViewModel, state: ScheduleUiState, account: Accoun
                 }
                 composable(ROUTE_NOTIFICATIONS) {
                     NotificationsScreen(account, city, onBack = { nav.popBackStack() }, onOpen = { n ->
-                        val slug = slugify(n.movieTitle.orEmpty())
-                        val target = vm.cities.firstOrNull { it.slug == n.citySlug }
-                        when {
-                            slug.isEmpty() -> Unit
-                            target == null || target.slug == city.slug -> nav.openFilm(slug)
-                            else -> { pendingFilm = slug; vm.selectCity(target) }
-                        }
+                        vm.openFilm(n.citySlug, slugify(n.movieTitle.orEmpty()))
                     })
                 }
                 composable(ROUTE_CITIES) {

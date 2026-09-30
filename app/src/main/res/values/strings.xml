@@ -124,4 +124,6 @@
     <string name="notifications_title">Notifications</string>
     <string name="notifications_empty">No notifications.</string>
     <string name="notification_text">%1$s is showing in %2$s</string>
+    <string name="channel_watchlist">Films on your list</string>
+    <string name="channel_watchlist_description">When a film you want to see starts showing, reminders and last days.</string>
 </resources>

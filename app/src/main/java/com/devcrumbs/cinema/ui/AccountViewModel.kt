@@ -15,6 +15,7 @@ import com.devcrumbs.cinema.data.City
 import com.devcrumbs.cinema.data.KeystoreSessionStore
 import com.devcrumbs.cinema.data.NotLoggedInException
 import com.devcrumbs.cinema.data.WatchlistAdd
+import com.devcrumbs.cinema.push.FirebasePushDevice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,7 +26,7 @@ import kotlinx.coroutines.launch
 /** Login, "Voglio vederlo", "Già visti", notifications — for every screen. */
 class AccountViewModel @JvmOverloads constructor(
     app: Application,
-    val repo: AccountRepository = AccountRepository(AccountApi(), KeystoreSessionStore(app)),
+    val repo: AccountRepository = AccountRepository(AccountApi(), KeystoreSessionStore(app), FirebasePushDevice),
 ) : AndroidViewModel(app) {
     val state: StateFlow<AccountState> = repo.state
 
@@ -57,7 +58,7 @@ class AccountViewModel @JvmOverloads constructor(
         else repo.addToWatchlist(city, add)
     }
 
-    fun logout() = repo.logout()
+    fun signOut(city: City) = act { repo.signOut(city) }
 }
 
 /** A user-facing message for an account call that failed. */

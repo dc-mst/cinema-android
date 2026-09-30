@@ -9,6 +9,23 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+/**
+ * This install's push identity (Firebase Cloud Messaging), kept out of the
+ * repository so tests and previews need no Firebase.
+ */
+interface PushDevice {
+    /** The current FCM token, or null when push is unavailable. */
+    suspend fun token(): String?
+
+    /** Invalidates the token (fire and forget): the server then drops it on its next send. */
+    fun forget()
+}
+
+object NoPushDevice : PushDevice {
+    override suspend fun token(): String? = null
+    override fun forget() = Unit
+}
+
 /** An account action was asked for while logged out. */
 class NotLoggedInException : IllegalStateException("Not logged in")
 
@@ -39,6 +56,7 @@ data class AccountState(
 class AccountRepository(
     private val api: AccountApi,
     private val store: SessionStore,
+    private val push: PushDevice = NoPushDevice,
 ) {
     private val _state = MutableStateFlow(AccountState(session = store.load()))
     val state: StateFlow<AccountState> = _state.asStateFlow()
@@ -58,9 +76,31 @@ class AccountRepository(
 
     suspend fun forgotPassword(city: City, email: String): String? = api.forgotPassword(city, email.trim())
 
+    /**
+     * Logs out here. Also invalidates this install's push token: when the
+     * session expired (401) the server row cannot be removed with it, and the
+     * phone must stop receiving the old account's alerts anyway.
+     */
     fun logout() {
         store.save(null)
         _state.value = AccountState()
+        push.forget()
+    }
+
+    /** The user's own logout: unregisters this phone first (best-effort), then [logout]. */
+    suspend fun signOut(city: City) {
+        val session = _state.value.session
+        if (session != null) {
+            runCatching { push.token()?.let { api.removeDevice(city, session.token, it) } }
+        }
+        logout()
+    }
+
+    /** Registers this install for push (after login, at start, when FCM rotates the token). */
+    suspend fun registerDevice(city: City, deviceToken: String? = null) {
+        if (!_state.value.loggedIn) return
+        val token = deviceToken ?: runCatching { push.token() }.getOrNull() ?: return
+        runCatching { authed { api.registerDevice(city, it, token) } }
     }
 
     private suspend fun start(city: City, session: Session) {
@@ -85,6 +125,7 @@ class AccountRepository(
             val theme = prefs["theme"]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
             _state.update { it.copy(theme = theme?.takeIf { t -> t == "light" || t == "dark" }) }
         }
+        registerDevice(city)
     }
 
     /** `has_screenings` depends on the city asked: call again after a city change. */

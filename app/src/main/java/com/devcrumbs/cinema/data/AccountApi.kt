@@ -112,6 +112,18 @@ class AccountApi(
         }
     }
 
+    // ── Push: this install's FCM token (stored once for every city) ──
+
+    suspend fun registerDevice(city: City, token: String, deviceToken: String) {
+        send<MessageResponse>(city, "push/device", token, "POST", body {
+            put("token", deviceToken); put("platform", "android")
+        })
+    }
+
+    suspend fun removeDevice(city: City, token: String, deviceToken: String) {
+        send<MessageResponse>(city, "push/device", token, "DELETE", body { put("token", deviceToken) })
+    }
+
     // ── Preferences (language, theme: shared by every city) ──
 
     suspend fun preferences(city: City, token: String): JsonObject =

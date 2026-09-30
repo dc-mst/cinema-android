@@ -83,6 +83,19 @@ AES-GCM key (`data/SessionStore.kt`, own prefs file excluded from backups). A
 | `GET /user/cities`, `PUT /user/cities/<slug>` | Email / Alerts per city |
 | `GET /user/notifications?all_cities=1`, `POST …/read-all?all_cities=1` | Every city's notifications; opening the list marks them read, as on the website |
 | `GET/PUT /user/preferences` | `language`, `theme` (person-level, shared with the websites; the app follows `theme` when set) |
+| `POST/DELETE /push/device` | This install's FCM token — registered after login, at each start and when FCM rotates it; removed on logout |
+
+### Push notifications (Firebase Cloud Messaging)
+
+Firebase project **cinema-devcrumbs**; `app/google-services.json` is its client
+config (committed — it identifies the app, it is not a secret). Messaging only,
+no Analytics. The backend (`app/services/fcm.py` in the platform) sends
+**data-only** messages for the same events as its web push — a film on the list
+starts showing, a reminder, last days — from each city whose *Alerts* switch
+the person turned on. `push/Push.kt` builds the notification ("Films on your
+list" channel); a tap opens the film in the city that sent it. Android 13+ asks
+for the permission once, after login. Logout unregisters the phone and deletes
+the FCM token (also when the session expired, so an old account's alerts stop).
 
 DTOs in `data/Models.kt` and `data/Account.kt` mirror the backend's `to_dict()` shapes; unknown fields
 are ignored, so adding backend fields never breaks the app. Removing or renaming
@@ -104,6 +117,7 @@ app/src/main/java/com/devcrumbs/cinema/
 ├── data/AccountApi.kt        ← account endpoints (Bearer token)
 ├── data/AccountRepository.kt ← login state + lists, optimistic changes, 401 → logout
 ├── data/SessionStore.kt      ← Keystore-encrypted session
+├── push/Push.kt              ← FCM token, messaging service, notifications
 └── ui/
     ├── AppNavigation.kt      ← bottom bar + routes (film, cinema, genre, tmdb, top detail)
     ├── ScheduleViewModel.kt  ← city, day, filters, /api/site
@@ -153,6 +167,5 @@ Status, order and the backend work each step needs are tracked in
 [`services/cinema-platform/docs/android-app-roadmap.md`](https://github.com/dc-mst/server3management/blob/master/services/cinema-platform/docs/android-app-roadmap.md)
 in `dc-mst/server3management` — start there when resuming.
 
-- Push notifications to the app (needs Firebase Cloud Messaging + backend work).
 - Google login in the app (needs an Android OAuth client per city project).
 - Release signing / Play Store listing (the release APK is unsigned).

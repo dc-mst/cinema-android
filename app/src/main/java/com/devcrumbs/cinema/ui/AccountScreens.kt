@@ -1,5 +1,12 @@
 package com.devcrumbs.cinema.ui
 
+import android.Manifest
+import android.content.Context
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.devcrumbs.cinema.push.PushNotifications
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -141,7 +148,7 @@ fun AccountScreen(
                 )
             }
             item {
-                OutlinedButton(onClick = account::logout, modifier = Modifier.padding(16.dp)) {
+                OutlinedButton(onClick = { account.signOut(city) }, modifier = Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.logout))
                 }
             }
@@ -639,3 +646,26 @@ fun FilmAccountActions(city: City, title: String, add: WatchlistAdd?) {
         )
     }
 }
+
+// ── Notification permission (Android 13+) ───────────────────────────────────
+
+/**
+ * Asks once, right after login, for permission to show alerts. Once per
+ * install: Android itself stops showing the dialog after two refusals, and the
+ * choice can be changed in the system settings.
+ */
+@Composable
+fun AskNotificationPermission(loggedIn: Boolean) {
+    if (Build.VERSION.SDK_INT < 33) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(loggedIn) {
+        if (!loggedIn || PushNotifications.canNotify(context)) return@LaunchedEffect
+        val prefs = context.getSharedPreferences("cinema", Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_ASKED_NOTIFICATIONS, false)) return@LaunchedEffect
+        prefs.edit().putBoolean(KEY_ASKED_NOTIFICATIONS, true).apply()
+        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
+
+private const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
