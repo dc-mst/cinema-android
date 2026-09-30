@@ -206,6 +206,9 @@ private fun AuthForm(account: AccountViewModel, city: City) {
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val googleClientId = stringResource(R.string.google_web_client_id)
+    val googleFailed = stringResource(R.string.google_sign_in_failed)
 
     val invalidEmail = stringResource(R.string.invalid_email)
     val shortPassword = stringResource(R.string.password_too_short, MIN_PASSWORD)
@@ -244,6 +247,29 @@ private fun AuthForm(account: AccountViewModel, city: City) {
                     // Validation (400): the server's own words say what is wrong.
                     e is ApiException && e.code == 400 && e.serverMessage != null -> e.serverMessage
                     else -> errorTexts.getValue(accountErrorText(e))
+                }
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun signInWithGoogle() {
+        error = null
+        info = null
+        busy = true
+        scope.launch {
+            try {
+                val idToken = requestGoogleIdToken(context, googleClientId) ?: return@launch // dismissed
+                account.repo.loginWithGoogle(city, idToken)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error = when {
+                    // Rejected token (401) or bad request (400) is a sign-in problem, not an expired session.
+                    e is ApiException && e.code in listOf(400, 401) -> googleFailed
+                    e is ApiException || e is java.io.IOException -> errorTexts.getValue(accountErrorText(e))
+                    else -> googleFailed // Credential Manager refused or has no Google account
                 }
             } finally {
                 busy = false
@@ -306,6 +332,13 @@ private fun AuthForm(account: AccountViewModel, city: City) {
                         AuthMode.FORGOT -> R.string.send_reset_link
                     },
                 ))
+            }
+        }
+        if (mode != AuthMode.FORGOT) {
+            item {
+                OutlinedButton(onClick = ::signInWithGoogle, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.continue_with_google))
+                }
             }
         }
         item {

@@ -38,6 +38,10 @@ class AccountApi(
     suspend fun login(city: City, email: String, password: String): AuthResponse =
         send(city, "auth/login", null, "POST", body { put("email", email); put("password", password) })
 
+    /** [credential] is the Google ID token; the server finds or creates the account by its verified email. */
+    suspend fun google(city: City, credential: String): AuthResponse =
+        send(city, "auth/google", null, "POST", body { put("credential", credential) })
+
     /** The reset link the server emails finishes on [city]'s website. */
     suspend fun forgotPassword(city: City, email: String): String? =
         send<MessageResponse>(city, "auth/forgot-password", null, "POST", body { put("email", email) }).message

@@ -348,6 +348,26 @@ class AccountTest {
     }
 
     @Test
+    fun `google sign-in posts the id token and starts a session`() = runBlocking {
+        loggedInBackend()
+        route("POST /api/auth/google") { """{"token": "gtok", "user": $userJson}""" }
+        val repo = AccountRepository(api, InMemorySessionStore())
+        repo.loginWithGoogle(city, "google-id-token")
+        val request = requests.first { it.requestUrl!!.encodedPath == "/api/auth/google" }
+        assertEquals("google-id-token", bodyOf(request)["credential"]!!.jsonPrimitive.content)
+        assertTrue(repo.state.value.loggedIn)
+        assertEquals("gtok", repo.state.value.session!!.token)
+    }
+
+    @Test
+    fun `a rejected google token leaves the person logged out`() = runBlocking {
+        route("POST /api/auth/google", code = 401) { """{"error": "Token Google non valido o scaduto."}""" }
+        val repo = AccountRepository(api, InMemorySessionStore())
+        try { repo.loginWithGoogle(city, "bad"); fail("should throw") } catch (e: ApiException) { assertEquals(401, e.code) }
+        assertFalse(repo.state.value.loggedIn)
+    }
+
+    @Test
     fun `sign out unregisters the phone, then forgets its token`() = runBlocking {
         loggedInBackend()
         route("POST /api/push/device") { """{"message": "ok"}""" }

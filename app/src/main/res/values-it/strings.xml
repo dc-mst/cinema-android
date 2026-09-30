@@ -126,4 +126,6 @@
     <string name="channel_watchlist">Film della tua lista</string>
     <string name="channel_watchlist_description">Quando un film che vuoi vedere arriva in programmazione, promemoria e ultimi giorni.</string>
     <string name="switch_new_films">Nuovi film</string>
+    <string name="continue_with_google">Continua con Google</string>
+    <string name="google_sign_in_failed">Accesso con Google non riuscito. Riprova o usa email e password.</string>
 </resources>

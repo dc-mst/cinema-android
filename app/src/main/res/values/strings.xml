@@ -127,4 +127,9 @@
     <string name="channel_watchlist">Films on your list</string>
     <string name="channel_watchlist_description">When a film you want to see starts showing, reminders and last days.</string>
     <string name="switch_new_films">New films</string>
+    <!-- Web client id of the Google project holding the app's Android OAuth client; the
+         backend accepts its ID tokens (GOOGLE_APP_CLIENT_IDS). Public, not a secret. -->
+    <string name="google_web_client_id" translatable="false">755273768603-fru20u009pv4amkpqu9och0g3ia5og4u.apps.googleusercontent.com</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="google_sign_in_failed">Google sign-in failed. Try again or use your email and password.</string>
 </resources>

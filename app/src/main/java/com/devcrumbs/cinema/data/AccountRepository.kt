@@ -95,6 +95,12 @@ class AccountRepository(
         start(city, Session(response.token, response.user))
     }
 
+    /** Signs in (or registers, through [city]) with a Google ID token from Credential Manager. */
+    suspend fun loginWithGoogle(city: City, credential: String) {
+        val response = api.google(city, credential)
+        start(city, Session(response.token, response.user))
+    }
+
     suspend fun forgotPassword(city: City, email: String): String? = api.forgotPassword(city, email.trim())
 
     /**
