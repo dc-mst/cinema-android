@@ -66,7 +66,7 @@ tasks.withType<Test>().configureEach {
  * truth the backend and the web frontend read). After adding a city there, or
  * changing a city's `[site].url`, regenerate it with:
  *
- *   ./gradlew syncCities -PcinemaPlatform=/path/to/server3management/services/cinema-platform
+ *   ./gradlew syncCities -PcinemaPlatform=/path/to/server4/services/cinema-platform
  *
  * `_template` is skipped, like everywhere else on the platform.
  */

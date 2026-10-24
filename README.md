@@ -1,7 +1,7 @@
 # Cinema — Android app
 
 A native Kotlin / Jetpack Compose client for **every city** of the cinema platform
-(Cinema Bologna, Firenze, Milano, Torino — the backend lives in `server3management`).
+(Cinema Bologna, Firenze, Milano, Torino — the backend lives in `server4`).
 The user picks a city (remembered across launches); four tabs then cover what
 the city's website offers:
 
@@ -32,12 +32,12 @@ programme, account endpoints once logged in.
 `app/src/main/assets/cities.json` (`slug`, `name`, `url`, `city_name` per city),
 derived from the cinema platform's `backend/cities/*/city.toml` — the single
 source of truth the backend and web frontend read, in
-[`dc-mst/server3management`](https://github.com/dc-mst/server3management)
+[`dc-mst/server4`](https://github.com/dc-mst/server4)
 under `services/cinema-platform/`. After a city is added there (or a city's
 `[site].url` changes), regenerate the file and commit it:
 
 ```bash
-./gradlew syncCities -PcinemaPlatform=/path/to/server3management/services/cinema-platform
+./gradlew syncCities -PcinemaPlatform=/path/to/server4/services/cinema-platform
 ```
 
 The task skips `_template` and fails if a `city.toml` lacks one of those keys.
@@ -166,8 +166,8 @@ SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*ScreenshotTest*' # renders s
 ## Not done yet
 
 Status, order and the backend work each step needs are tracked in
-[`services/cinema-platform/docs/android-app-roadmap.md`](https://github.com/dc-mst/server3management/blob/master/services/cinema-platform/docs/android-app-roadmap.md)
-in `dc-mst/server3management` — start there when resuming.
+[`services/cinema-platform/docs/android-app-roadmap.md`](https://github.com/dc-mst/server4/blob/master/services/cinema-platform/docs/android-app-roadmap.md)
+in `dc-mst/server4` — start there when resuming.
 
 - Google login in the app (needs an Android OAuth client per city project).
 - Release signing / Play Store listing (the release APK is unsigned).
